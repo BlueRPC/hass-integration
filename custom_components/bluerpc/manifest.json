@@ -1,0 +1,15 @@
+{
+  "domain": "bluerpc",
+  "name": "BlueRPC",
+  "documentation": "https://bluerpc.github.io/integrations/hass/",
+  "issue_tracker": "https://github.com/BlueRPC/hass-integration",
+  "after_dependencies": ["zeroconf"],
+  "dependencies": ["bluetooth"],
+  "config_flow": true,
+  "codeowners": ["@drosocode"],
+  "integration_type": "device",
+  "requirements": ["protobuf", "grpcio"],
+  "version": "2.0.0",
+  "iot_class": "local_push",
+  "zeroconf": ["_bluerpc._tcp.local."]
+}
