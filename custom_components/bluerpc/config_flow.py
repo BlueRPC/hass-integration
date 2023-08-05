@@ -24,7 +24,6 @@ from .const import (
     CONF_ENCRYPTION_PASSWORD,
     DEFAULT_PORT,
     DOMAIN,
-    KEYSTORE_DEFAULT_NAME,
 )
 
 
@@ -181,7 +180,7 @@ class BlueRPCFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             signing_key=ca_key,
         )
         worker_keystore = create_keystore(
-            worker_key, worker_cert, ca_cert, keystore_password, KEYSTORE_DEFAULT_NAME
+            worker_key, worker_cert, ca_cert, keystore_password
         )
 
         client = BlueRPC(
