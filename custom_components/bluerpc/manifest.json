@@ -8,7 +8,7 @@
   "config_flow": true,
   "codeowners": ["@drosocode"],
   "integration_type": "device",
-  "requirements": ["protobuf", "grpcio"],
+  "requirements": ["bluerpc-client"],
   "version": "2.0.0",
   "iot_class": "local_push",
   "zeroconf": ["_bluerpc._tcp.local."]

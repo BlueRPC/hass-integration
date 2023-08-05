@@ -1,9 +1,12 @@
 """The BlueRPC Bluetooth Integration"""
+import base64
+import json
 import logging
 from collections.abc import Callable
 from functools import partial
 
-import grpc
+from bluerpc_client import BlueRPC, BlueRPCBleakClient, WorkerMode, load_certs
+from homeassistant.components import zeroconf
 from homeassistant.components.bluetooth import (
     HaBluetoothConnector,
     async_get_advertisement_callback,
@@ -13,11 +16,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT
 from homeassistant.core import HomeAssistant
 from homeassistant.core import callback as hass_callback
+from homeassistant.helpers.storage import STORAGE_DIR
 
-from .client import BlueRPCClient
-from .const import DOMAIN, STARTUP_MESSAGE
-from .rpc import common_pb2, services_pb2_grpc
-from .scanner import BlueRPCScanner
+from .const import CONF_ENCRYPTED, DOMAIN, STARTUP_MESSAGE
+from .scanner import BlueRPCScannerHA
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,20 +32,50 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     host = entry.data.get(CONF_HOST)
     port = entry.data.get(CONF_PORT)
+    zeroconf_instance = await zeroconf.async_get_instance(hass)
+
     try:
-        client = services_pb2_grpc.BlueRPCStub(
-            grpc.aio.insecure_channel(f"{host}:{port}")
-        )
-        settings = await client.Hello(
-            common_pb2.HelloRequest(name="HomeAssistant", version="1.0")
-        )
-        _LOGGER.info(
-            f"connected to {settings.name} v{settings.version} ({settings.operating_system}: {settings.operating_system_version})"
-        )
-        if common_pb2.WORKER_MODE_GATT_PASSIVE not in settings.supported_modes:
+        if entry.data.get(CONF_ENCRYPTED):
+            with open(hass.config.path(STORAGE_DIR, "bluerpc.json"), "r") as f:
+                keys_data = json.load(f)
+            _, ca_cert = load_certs(
+                None,
+                base64.b64decode(keys_data["ca"][1]),
+            )
+            hass_key, hass_cert = load_certs(
+                base64.b64decode(keys_data["ca"][0]),
+                base64.b64decode(keys_data["ca"][1]),
+            )
+            client = BlueRPC(
+                host,
+                port,
+                hass_key,
+                hass_cert,
+                ca_cert,
+                "homeassistant",
+                True,
+                None,
+                zeroconf_instance,
+            )
+        else:
+            client = BlueRPC(
+                host,
+                port,
+                None,
+                None,
+                None,
+                "homeassistant",
+                True,
+                None,
+                zeroconf_instance,
+            )
+        await client.connect()
+
+        if WorkerMode.WORKER_MODE_GATT_PASSIVE not in client.settings.supported_modes:
             _LOGGER.error("scanning not supported by this worker")
             return False
-        if not await async_connect_scanner(hass, entry, client, settings):
+
+        if not await async_connect_scanner(hass, entry, client):
             return False
     except Exception as e:
         _LOGGER.error(str(e))
@@ -53,26 +85,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 @hass_callback
-def _async_can_connect_factory(
-    client: services_pb2_grpc.BlueRPCStub,
+async def _async_can_connect_factory(
+    client: BlueRPC,
 ) -> Callable[[], bool]:
     """Create a can_connect function for a specific RuntimeEntryData instance."""
 
     @hass_callback
-    def _async_can_connect() -> bool:
+    async def _async_can_connect() -> bool:
         """Check if a given source can make another connection."""
-        return True
-        try:
-            resp = client.BLEGetDevices(common_pb2.Void())
-            assert resp.status.code == common_pb2.ERROR_CODE_OK
-            assert (
-                resp.max_connections == 0
-                or resp.connected_devices < resp.max_connections
-            )
-            return True
-        except Exception as e:
-            _LOGGER.error(str(e))
-            return False
+        return client.can_connect()
 
     return _async_can_connect
 
@@ -80,29 +101,30 @@ def _async_can_connect_factory(
 async def async_connect_scanner(
     hass: HomeAssistant,
     entry: ConfigEntry,
-    client: services_pb2_grpc.BlueRPCStub,
-    settings: common_pb2.HelloResponse,
+    client: BlueRPC,
 ) -> bool:
     """Connect scanner."""
-    assert entry.data.get(CONF_NAME) is not None
     source = entry.data.get(CONF_NAME)
+    assert source is not None
     new_info_callback = async_get_advertisement_callback(hass)
     connector = HaBluetoothConnector(
         # MyPy doesn't like partials, but this is correct
         # https://github.com/python/mypy/issues/1484
-        client=partial(BlueRPCClient, client=client),  # type: ignore[arg-type]
+        client=partial(BlueRPCBleakClient, client=client),  # type: ignore[arg-type]
         source=source,
         can_connect=_async_can_connect_factory(client),
     )
-    connectable = common_pb2.WORKER_MODE_GATT_ACTIVE in settings.supported_modes
+    connectable = WorkerMode.WORKER_MODE_GATT_ACTIVE in client.settings.supported_modes
     if not connectable:
         _LOGGER.info("connection not supported by this worker")
         return False
-    scanner = BlueRPCScanner(
+
+    scanner = BlueRPCScannerHA(
         hass, source, entry.title, new_info_callback, connector, connectable
     )
-    if not await scanner.start(client, settings.ble_filters_required):
+    if not await scanner.start(client):
         return False
+
     unload_callbacks = [
         async_register_scanner(hass, scanner, True),
         scanner.async_setup(),

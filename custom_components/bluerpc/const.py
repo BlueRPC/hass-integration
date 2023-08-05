@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 NAME = "BlueRPC"
 DOMAIN = "bluerpc"
 VERSION = "1.0"
@@ -13,5 +15,11 @@ If you have any issues with this you need to open an issue here:
 -------------------------------------------------------------------
 """
 
-DEFAULT_PORT = 50052
+DEFAULT_PORT = 5052
+CERT_DEFAULT_ORGANIZATION = "BlueRPC"
+CERT_DEFAULT_VALIDITY = timedelta(weeks=5000)
+CERT_DEFAULT_KEY_SIZE = 2048
+KEYSTORE_DEFAULT_NAME = "bluerpc-worker"
+
+CONF_ENCRYPTION_PASSWORD = "password"
 CONF_ENCRYPTED = "encrypted"
