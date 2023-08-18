@@ -40,7 +40,7 @@ class BlueRPCScannerHA(BaseHaRemoteScanner):
             (await self._get_services()),
             True,
         )
-        return self._scanner.start()
+        return (await self._scanner.start())
 
     async def stop(self):
         """Stop the scanner"""

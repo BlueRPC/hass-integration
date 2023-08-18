@@ -128,7 +128,7 @@ class BlueRPCFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             pass
 
         country = self.hass.config.country
-        cn = self.hass.config.internal_url
+        cn = self.hass.config.internal_url or self.hass.config.external_url or "*"
 
         # if certificate authority doesn't exists, create it and create hass certs
         if "ca" not in keys_data:
@@ -141,8 +141,8 @@ class BlueRPCFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 signing_key=None,
             )
             keys_data["ca"] = [
-                base64.b64encode(serialize_certs(ca_key)),
-                base64.b64encode(serialize_certs(ca_cert)),
+                base64.b64encode(serialize_certs(ca_key)).decode("utf-8"),
+                base64.b64encode(serialize_certs(ca_cert)).decode("utf-8"),
             ]
 
             hass_key, hass_cert = create_certs(
@@ -152,10 +152,11 @@ class BlueRPCFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 validity=CERT_DEFAULT_VALIDITY,
                 key_size=CERT_DEFAULT_KEY_SIZE,
                 signing_key=ca_key,
+                issuer_cert=ca_cert,
             )
             keys_data["hass"] = [
-                base64.b64encode(serialize_certs(hass_key)),
-                base64.b64encode(serialize_certs(hass_cert)),
+                base64.b64encode(serialize_certs(hass_key)).decode("utf-8"),
+                base64.b64encode(serialize_certs(hass_cert)).decode("utf-8"),
             ]
 
             with open(keys_path, "w+") as f:
@@ -178,6 +179,7 @@ class BlueRPCFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             validity=CERT_DEFAULT_VALIDITY,
             key_size=CERT_DEFAULT_KEY_SIZE,
             signing_key=ca_key,
+            issuer_cert=ca_cert,
         )
         worker_keystore = create_keystore(
             worker_key, worker_cert, ca_cert, keystore_password
@@ -195,4 +197,4 @@ class BlueRPCFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             None,
         )
         await client.connect()
-        return client.set_keystore(worker_keystore, True, True)
+        return await client.set_keystore(worker_keystore, True, True)

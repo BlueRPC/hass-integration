@@ -1,6 +1,6 @@
 {
   "config": {
-    "flow_title": "BlueRPC",
+    "flow_title": "bluerpc",
     "step": {
       "user": {
         "description": "Enter the connection settings to your BlueRPC worker.",

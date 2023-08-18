@@ -5,7 +5,7 @@ import logging
 from collections.abc import Callable
 from functools import partial
 
-from bluerpc_client import BlueRPC, BlueRPCBleakClient, WorkerMode, load_certs
+from bluerpc_client import BlueRPC, BlueRPCBleakClient, WorkerMode
 from homeassistant.components import zeroconf
 from homeassistant.components.bluetooth import (
     HaBluetoothConnector,
@@ -38,20 +38,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if entry.data.get(CONF_ENCRYPTED):
             with open(hass.config.path(STORAGE_DIR, "bluerpc.json"), "r") as f:
                 keys_data = json.load(f)
-            _, ca_cert = load_certs(
-                None,
-                base64.b64decode(keys_data["ca"][1]),
-            )
-            hass_key, hass_cert = load_certs(
-                base64.b64decode(keys_data["ca"][0]),
-                base64.b64decode(keys_data["ca"][1]),
-            )
             client = BlueRPC(
                 host,
                 port,
-                hass_key,
-                hass_cert,
-                ca_cert,
+                base64.b64decode(keys_data["hass"][0]),
+                base64.b64decode(keys_data["hass"][1]),
+                base64.b64decode(keys_data["ca"][1]),
                 "homeassistant",
                 True,
                 None,
@@ -69,7 +61,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 None,
                 zeroconf_instance,
             )
-        await client.connect()
+        success = await client.connect()
+
+        _LOGGER.warning("success:")
+        _LOGGER.warning(success)
 
         if WorkerMode.WORKER_MODE_GATT_PASSIVE not in client.settings.supported_modes:
             _LOGGER.error("scanning not supported by this worker")
@@ -122,7 +117,7 @@ async def async_connect_scanner(
     scanner = BlueRPCScannerHA(
         hass, source, entry.title, new_info_callback, connector, connectable
     )
-    if not await scanner.start(client):
+    if not (await scanner.start(client)):
         return False
 
     unload_callbacks = [
