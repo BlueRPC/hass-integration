@@ -1,0 +1,13 @@
+version: '3'
+services:
+  homeassistant_test:
+    build: .
+    volumes:
+      - ./data:/config
+      - ./configuration.yaml:/config/configuration.yaml
+      - ./custom_components/bluerpc:/config/custom_components/bluerpc
+    environment:
+      - TZ=Europe/Paris
+    restart: unless-stopped
+    ports:
+      - 8124:8123
