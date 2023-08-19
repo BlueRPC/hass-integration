@@ -33,11 +33,16 @@ class BlueRPCScannerHA(BaseHaRemoteScanner):
 
     async def start(self, client) -> bool:
         """Start the scanner"""
+        svc_filters = []
+        # only set filters if this is required by the worker (ex: android)
+        if client.settings.ble_filters_required:
+            svc_filters = await self._get_services()
+
         self._scanner = BlueRPCBLEScanner(
             client,
             self._advertisement,
             self._on_disconnect,
-            (await self._get_services()),
+            svc_filters,
             True,
         )
         return (await self._scanner.start())
