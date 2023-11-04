@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from bluerpc_client import BlueRPCBLEAdvertisement, BlueRPCBLEScanner
 from homeassistant.components.bluetooth import BaseHaRemoteScanner
@@ -64,4 +65,5 @@ class BlueRPCScannerHA(BaseHaRemoteScanner):
             adv.manufacturer_data,
             adv.txpwr,
             {},
+            time.time()
         )
